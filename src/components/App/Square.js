@@ -2,19 +2,21 @@ import '../../index.css';
 
 
 /**
- * hàm nhậ
- * @param props
+ * 1 ô trong bàn cờ
+ * @param isWin: check if
+ * @param onClick: hàm xử lý sự kiện click vào từng ô
+ * @param value: giá trị bên trong 1 ô (X hoặc O)
  * @returns {JSX.Element}
  * @constructor
  */
-export default function Square(props) {
-    const className = 'square' + (props.isWin ? ' highlight' : '')
+export default function Square({isWin, onClick, value}) {
+    const className = 'square' + (isWin ? ' highlight' : '')
     return (
         <button
             className={className}
-            onClick={props.onClick}  // ở đây sẽ gọi hàm onClick đc Board truyền thông qua props => Square ko cần làm gì cả, để cho thằng cha làm (có thể là Board hoặc Game gì đó ko cần biết)
+            onClick={onClick}
         >
-            {props.value}
+            {value}
         </button>
     );
 }
