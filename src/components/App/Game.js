@@ -1,9 +1,101 @@
 import React, {useState} from "react";
 import Board from './Board';
+import Form from './Form';
 
-let boardSize = 27;
-const lines = createWinLine(boardSize);
+// init size
+let boardSize = 8;
+let lines = createWinLine(boardSize);
 
+
+export default function Game () {
+    const [history, setHistory] = useState([
+        {
+            squares: Array(boardSize * boardSize).fill(null)       // mảng đại diện cho cả bàn cờ ở mỗi bước, ô nào đã được đi thì là 'X' hoặc 'O', chưa đi là null
+        }
+    ])
+    const [stepNumber, setStepNumber] = useState(0)         // bước nào đang đc hiển thị
+    const [xIsNext, setXIsNext] = useState(true)            // kiểm tra người chơi tiếp theo đi X hay O
+    const [isDescending, setIsDescending] = useState(true)  // kiểm tra user sắp xếp thứ tự move theo tăng hay giảm
+
+
+    const resetGame = (newBoardSize) => {
+        boardSize = parseInt(newBoardSize);
+        lines = createWinLine(boardSize);
+        setHistory([
+            {
+                squares: Array(boardSize * boardSize).fill(null)
+            }
+        ])
+        setStepNumber(0)
+        setXIsNext(true)
+        setIsDescending(true)
+    }
+
+    const current = history[stepNumber];                 // bàn cờ hiện tại (để truyền vào Board)
+
+    const winInfo = calculateWinner(current.squares, lines);    // để hiển thị winner hay next player
+    const winner = winInfo.winner
+    const winLine = winInfo.line
+
+    // dùng map(element, index) biến history thành các React element biểu diễn bằng các button trên màn hình
+    const moves = history.map((step, move) => {
+        const desc = move
+            ? `Go to move #${move} - Location (col,row): (${history[move].location[0]}, ${history[move].location[1]})`
+            : 'Go to game start';
+        const check_curr = move === stepNumber   // dùng để bold bước hiện tại
+        return (
+            <li key={move}>
+                <button onClick={() => jumpTo(setStepNumber, setXIsNext, move)}>
+                    { check_curr ? <b> {desc} </b> : desc }
+                </button>
+            </li>
+        );
+    });
+
+    let status;
+    if (winner) {
+        status = 'The Winner: ' + winner;
+    }
+    else if (!current.squares.includes(null)) {         // tất cả các ô đều không null mà vẫn chưa vào vòng if(winner) => hòa
+        status = 'Result: Draw'
+    }
+    else {
+        status = 'Next player: ' + (xIsNext ? 'X' : 'O');
+    }
+
+
+    return (
+        <div className="game">
+            <div className="game-board" >
+                <Board
+                    squares={current.squares}        // lịch sử đấu hiện tại (bàn cờ hiện tại để truyền vào Board)
+                    onClick={(i) => handleClick(history, setHistory, stepNumber, setStepNumber, xIsNext, setXIsNext, i, boardSize, lines)}
+                    winLine = {winLine}
+                    boardSize= {boardSize}
+                />
+            </div>
+
+            <div className="game-info">
+                <Form
+                    value={boardSize}
+                    onSubmit = {resetGame}
+                />
+
+                <div><b>{ status }</b></div>
+
+                <button onClick={ () => sortMoves(setIsDescending, isDescending)}>
+                    Sort moves#: {isDescending ? 'descending' : 'ascending ' }
+                </button>
+                <ol>{
+                    isDescending
+                        ? moves
+                        : moves.splice(0,1).concat(moves.reverse())  // chức năng đảo ngược các moves
+                }</ol>
+            </div>
+        </div>
+    );
+
+}
 
 /**
  * tạo ra mảng tọa độ của cả bàn cờ (phục vụ cho việc hiển thị lịch sử theo dạng (dòng, cột)
@@ -53,13 +145,13 @@ const jumpTo = (setStepNumber, setXIsNext, step) => {
  * @param setXIsNext: setState
  * @param i: ô hiện tại
  */
-const handleClick = (history, setHistory, stepNumber, setStepNumber, xIsNext, setXIsNext, i) => {
+const handleClick = (history, setHistory, stepNumber, setStepNumber, xIsNext, setXIsNext, i, boardSize, lines) => {
     const locations = creatLocation(boardSize)                      // tạo mảng tọa độ của tất cả các ô bàn cờ
     const currHist = history.slice(0, stepNumber + 1);              // lấy ra lịch sử từ đầu đến bước hiện tại (stepNumber) => để đảm bảo sau khi undo thì các history tương lai ko bị sai
     const current = currHist[currHist.length - 1];                  // hiện tại là cái mới nhất (ptủ cuối của mảng)
     const squares = current.squares.slice();                        // copy squares của state sang object mới => để React so sánh 2 cái mà cập nhật => immuatable
 
-    if (calculateWinner(squares).winner || squares[i]) {            // nếu hết game hoặc đã đc ấn thì ko xử lý nữa
+    if (calculateWinner(squares, lines).winner || squares[i]) {            // nếu hết game hoặc đã đc ấn thì ko xử lý nữa
         return;
     }
     squares[i] = xIsNext ? 'X' : 'O';
@@ -74,75 +166,6 @@ const handleClick = (history, setHistory, stepNumber, setStepNumber, xIsNext, se
 
 
 
-export default function Game () {
-    const [history, setHistory] = useState([
-        {
-            squares: Array(boardSize * boardSize).fill(null)       // mảng đại diện cho cả bàn cờ ở mỗi bước, ô nào đã được đi thì là 'X' hoặc 'O', chưa đi là null
-        }
-    ])
-    const [stepNumber, setStepNumber] = useState(0)         // bước nào đang đc hiển thị
-    const [xIsNext, setXIsNext] = useState(true)            // kiểm tra người chơi tiếp theo đi X hay O
-    const [isDescending, setIsDescending] = useState(true)  // kiểm tra user sắp xếp thứ tự move theo tăng hay giảm
-
-    const current = history[stepNumber];                 // bàn cờ hiện tại (để truyền vào Board)
-    const winInfo = calculateWinner(current.squares);    // để hiển thị winner hay next player
-    const winner = winInfo.winner
-    const winLine = winInfo.line
-
-    // dùng map(element, index) biến history thành các React element biểu diễn bằng các button trên màn hình
-    const moves = history.map((step, move) => {
-        const desc = move
-            ? `Go to move #${move} - Location (col,row): (${history[move].location[0]}, ${history[move].location[1]})`
-            : 'Go to game start';
-        const check_curr = move === stepNumber   // dùng để bold bước hiện tại
-        return (
-            <li key={move}>
-                <button onClick={() => jumpTo(setStepNumber, setXIsNext, move)}>
-                    { check_curr ? <b> {desc} </b> : desc }
-                </button>
-            </li>
-        );
-    });
-
-    let status;
-    if (winner) {
-        status = 'The Winner: ' + winner;
-    }
-    else if (!current.squares.includes(null)) {         // tất cả các ô đều không null mà vẫn chưa vào vòng if(winner) => hòa
-        status = 'Result: Draw'
-    }
-    else {
-        status = 'Next player: ' + (xIsNext ? 'X' : 'O');
-    }
-
-
-    return (
-        <div className="game">
-            <div className="game-board" >
-                <Board
-                    squares={current.squares}        // lịch sử đấu hiện tại (bàn cờ hiện tại để truyền vào Board)
-                    onClick={(i) => handleClick(history, setHistory, stepNumber, setStepNumber, xIsNext, setXIsNext, i)}
-                    winLine = {winLine}
-                    boardSize= {boardSize}
-                />
-            </div>
-
-            <div className="game-info">
-                <div><b>{ status }</b></div>
-                <button onClick={ () => sortMoves(setIsDescending, isDescending)}>
-                    Sort moves#: {isDescending ? 'descending' : 'ascending ' }
-                </button>
-                <ol>{
-                    isDescending
-                        ? moves
-                        : moves.splice(0,1).concat(moves.reverse())  // chức năng đảo ngược các moves
-                }</ol>
-            </div>
-        </div>
-    );
-
-}
-
 
 /**
  * tạo ra line thắng (i, j là dòng, cột trong vòng for)
@@ -151,7 +174,7 @@ export default function Game () {
  * @param j: cột
  * @param res: mảng các line thắng (để push vào)
  */
-function createAntiDiag(i, j, res){
+function createAntiDiag(i, j, res, boardSize){
     let a1,a2,a3,a4,a5
     a1 = boardSize * i + j
     a2 = a1 + boardSize - 1
@@ -160,7 +183,7 @@ function createAntiDiag(i, j, res){
     a5 = a4 + boardSize - 1
     res.push([a1, a2, a3, a4, a5])
 }
-function createDiag(i, j, res){
+function createDiag(i, j, res, boardSize){
     let a1,a2,a3,a4,a5
     a1 = i * boardSize + j
     a2 = a1 + boardSize + 1
@@ -169,7 +192,7 @@ function createDiag(i, j, res){
     a5 = a4 + boardSize + 1
     res.push([a1, a2, a3, a4, a5])
 }
-function createRow(row_num, res){
+function createRow(row_num, res, boardSize){
     let start = row_num * boardSize
     let a1,a2,a3,a4,a5
     while(start + 4 < (row_num + 1) * boardSize){
@@ -182,7 +205,7 @@ function createRow(row_num, res){
         start++
     }
 }
-function createCol(row_num, res){
+function createCol(row_num, res, boardSize){
     let start = row_num
     let a1,a2,a3,a4,a5
     while(start + 4 * boardSize <= row_num + boardSize * (boardSize - 1)){
@@ -206,17 +229,17 @@ function createWinLine(boardSize){
     let result = []
 
     for(let i = 0; i < boardSize; i++){
-        createRow(i, result)
-        createCol(i,result)
+        createRow(i, result, boardSize)
+        createCol(i,result, boardSize)
     }
 
     for(let i = 0; i<boardSize; i++){
         for(let j = 0; j<boardSize; j++){
             if(i + 4 < boardSize && j + 4 < boardSize) {
-                createDiag(i, j, result)
+                createDiag(i, j, result, boardSize)
             }
             if(j - 4 >= 0 && i + 4 < boardSize) {
-                createAntiDiag(i, j, result)
+                createAntiDiag(i, j, result, boardSize)
             }
         }
     }
@@ -229,7 +252,7 @@ function createWinLine(boardSize){
  * @param squares: bàn cờ hiện tại
  * @returns {{winner: null, line: null}}
  */
-function calculateWinner(squares) {
+function calculateWinner(squares, lines) {
     let result = {
         winner: null,
         line: null
